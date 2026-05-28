@@ -57,11 +57,11 @@ The same idea applies to conditional logic. We have seen `if/else if/else` insid
 
 Create a new column `size` in `iris` based on `Sepal.Length`:
 
--- `"small"` if length \< 5
+-- `"small"` if length $\lt$ 5
 
--- `"medium"` if 5 ≤ length ≤ 6.5
+-- `"medium"` if 5 $\leq$ length $\leq$ 6.5
 
--- `"large"` if length \> 6.5
+-- `"large"` if length $\gt$ 6.5
 
 Do it two ways: first with a `for` loop and `if/else if/else`, then with nested `ifelse()`. Confirm both give the same result.
 
