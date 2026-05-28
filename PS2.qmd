@@ -55,7 +55,7 @@ Then we will compare the computing time between the two approaches. Note that we
 
 The same idea applies to conditional logic. We have seen `if/else if/else` inside a `for` loop, and we have seen `ifelse()` which is vectorized. Let's practice using both.
 
-Create a new column `size_class` in `iris` based on `Sepal.Length`:
+Create a new column `size` in `iris` based on `Sepal.Length`:
 
 -- `"small"` if length \< 5
 
@@ -88,4 +88,3 @@ Default `type` to `"table"` so the user doesn't have to specify it for the commo
 ```{r}
 
 ```
-
