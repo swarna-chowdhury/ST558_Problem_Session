@@ -12,7 +12,8 @@ Let's start with a `for` loop that does something a bit more interesting than pr
 Recall that the `iris` data set has 150 rows across three species (`setosa`, `versicolor`, `virginica`).
 
 ```{r}
-
+head(iris)
+levels(iris$Species)
 ```
 
 Our goal:
@@ -26,7 +27,21 @@ Our goal:
 Before writing the loop, take a moment to think about how you would initialize an empty list, and how to add to it as the loop runs. We've seen that `[[ ]]` is the way to grab (or assign to) a single element of a list by name.
 
 ```{r}
+species_summary <- list() #initializing an empty list
 
+for (sp in unique(iris$Species)) {
+  subset_data <- iris[iris$Species == sp, ]
+  species_summary[[sp]] <- list(
+    mean_pl = mean(subset_data$Petal.Length, na.rm = T),
+    sd_pl = sd(subset_data$Petal.Length, na.rm = T),
+    n = nrow(subset_data)
+  )
+}
+
+species_summary
+
+species_summary$versicolor
+species_summary[["versicolor"]]
 ```
 
 A few things worth discussing once we have it working:
@@ -48,7 +63,30 @@ For this problem, our goal is to compute the **column means** for the four numer
 Then we will compare the computing time between the two approaches. Note that we use the `microbenchmark` package, which you may need to install with `install.packages("microbenchmark")`; if you haven't already done so.
 
 ```{r}
+library(microbenchmark)
 
+numeric_cols <- iris[, 1:4] # creating a data.frame with numeric columns only
+
+# Loop version
+col_means_loop <- numeric(ncol(numeric_cols)) # initialized an empty vector
+
+microbenchmark(for (i in seq_along(numeric_cols)){
+  col_means_loop[i] = mean(numeric_cols[[i]])
+})
+
+
+# Vectorized version
+colMeans(numeric_cols)
+
+names(col_means_loop) <- names(numeric_cols)
+col_means_loop
+microbenchmark(colMeans(numeric_cols))
+```
+
+```{r}
+numeric_cols
+numeric_cols[3]
+numeric_cols[[3]]
 ```
 
 ## Vectorized if/then/else
@@ -66,7 +104,27 @@ Create a new column `size` in `iris` based on `Sepal.Length`:
 Do it two ways: first with a `for` loop and `if/else if/else`, then with nested `ifelse()`. Confirm both give the same result.
 
 ```{r}
+# for loop with if/ else if/else
+head(iris)
 
+iris$size_loop <- character(nrow(iris)) # initialized
+
+for (i in seq_len(nrow(iris))) {
+  if (iris$Sepal.Length[i] < 5) {
+    iris$size_loop[i] <- "small"
+  } else if (iris$Sepal.Length[i] <= 6.5) {
+    iris$size_loop[i] <- "medium"
+  } else {
+    iris$size_loop[i] <- "large"
+  }
+}
+
+head(iris)
+
+# Vectorized with ifelse
+iris$size_vectorized <- ifelse(iris$Sepal.Length < 5, "small", ifelse(iris$Sepal.Length <= 6.5, "medium", "large"))
+
+head(iris)
 ```
 
 ## Writing a function with `stop()` and `switch()`
@@ -86,5 +144,30 @@ Now let's write our own function. The idea: write a function called `make_table(
 Default `type` to `"table"` so the user doesn't have to specify it for the common case.
 
 ```{r}
+make_table <- function(df, col, type = "table"){
+  if(!is.data.frame(df)) {
+    stop("`df` must be a data frame.")
+  }
+  if(!(col %in% names(df)) ) {
+    stop("Column ", col, " not found in data frame")
+  }
+  
+  x <- df[[col]]
+  x <- na.omit(x) #remove missing values
+  
+  switch(type,
+         table =table(x),
+         prop = prop.table(table(x)),
+         sorted = sort(table(x), decreasing = T),
+         stop("`type` must be one of: 'table', 'prop', 'sorted'.")
+  )
+}
 
+# try it out
+make_table(df = iris, col = "Species")
+make_table(df = iris, col = "size_loop", type = "prop")
+make_table(iris, "size_vectorized", "sorted")
+
+#make_table(1:10, "Species")
+#make_table(iris, "Species", "prop")
 ```
