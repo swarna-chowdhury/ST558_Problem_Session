@@ -1,5 +1,6 @@
 ---
-title: "ST 558 Problem Session: Reading Data, dplyr & tidyr"
+title: "Problem Session 3"
+subtitle: "Reading Data, dplyr, tidyr & SQL"
 format: html
 editor: visual
 ---
@@ -59,7 +60,6 @@ Quick look at what we loaded:
 
 ```
 
-
 ## 1.3 Tibble vs. Data Frame
 
 Before we dive into manipulation, let's quickly note that `read_csv()` and `read_delim()` return **tibbles**, not plain data frames. Tibbles are a tidyverse-friendly version of a data frame with some helpful differences:
@@ -96,7 +96,6 @@ Select only the `carrier`, `origin`, `dest`, and `air_time` columns from `flight
 
 ```
 
-
 ### Question 2
 
 Make a data frame that keeps every variable except `dep_delay`. Call the new data frame `new.data`.
@@ -112,7 +111,6 @@ Use `select()` with a range (`:`) to keep all columns from `year` through `arr_d
 ```{r}
 
 ```
-
 
 ### Question 4
 
@@ -154,7 +152,6 @@ Arrange the `flights` data by `dep_delay` in descending order so the most delaye
 
 ```
 
-
 ## 2.4 Chaining: `filter()` + `arrange()` + `select()`
 
 ### Question 8
@@ -190,7 +187,6 @@ Use `mutate()` and `ifelse()` to create a new column `on_time` that is `"On Time
 
 ```
 
-
 ## 2.6 `group_by()` + `summarise()` — Summary Statistics by Group
 
 ### Question 11
@@ -200,7 +196,6 @@ Find the **mean and standard deviation of departure delay** for each carrier. Ar
 ```{r}
 
 ```
-
 
 ### Question 12 (Challenge)
 
@@ -216,7 +211,6 @@ Which month has the highest proportion of on-time arrivals?
 
 
 ```
-
 
 # Part 3: Reshaping Data with `tidyr`
 
@@ -242,7 +236,6 @@ Pivot `delay_summary` so that each row is a **carrier** and there is one column 
 ```{r}
 
 ```
-
 
 ## 3.2 `pivot_longer()` — Wide to Long
 
