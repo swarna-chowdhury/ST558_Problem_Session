@@ -29,19 +29,27 @@ If we go to File -\> Import Dataset we can choose to import a "From Text" data u
 The code from the import menu is produced here.
 
 ```{r}
+library(readr)
+household_power_consumption <- read_delim("~/Downloads/household_power_consumption.txt", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+View(household_power_consumption)
 
+head(household_power_consumption)
 ```
 
 What do you notice? Many numeric columns are read in as character (`<chr>`). Let's investigate why.
 
 ```{r}
-
+head(sort(household_power_consumption$Global_active_power))
 ```
 
 The `?` character is being used to represent missing values in this dataset, which confuses `readr`. We can fix this using the `na =` argument:
 
 ```{r}
-
+library(readr)
+household_power_consumption <- read_delim("~/Downloads/household_power_consumption.txt", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE, na = c("", "NA", "?"))
+head(household_power_consumption)
 ```
 
 Always inspect your data after reading it in. Unexpected character types are often a sign that missing values aren't being handled correctly.
@@ -51,7 +59,8 @@ Always inspect your data after reading it in. Unexpected character types are oft
 Before we dive into manipulation, let's quickly note that `read_delim()`/any reading functions from readr package return **tibbles**, not plain data frames. Tibbles are a tidyverse-friendly version of a data frame with some helpful differences:
 
 -   They print only the first 10 rows and as many columns as fit on screen.
--   They never silently convert strings to factors.
+-   They never changes the type of the inputs (e.g. never converts strings to factors!)
+-   They never changes the names of variables 
 -   They never create row names.
 
 Let's look at the differences in the output when we type `flights` (tibble) in the console versus typing `mtcars` (data frame) in the console.
@@ -59,7 +68,8 @@ Let's look at the differences in the output when we type `flights` (tibble) in t
 You can coerce a regular data frame to a tibble with `as_tibble()`. Let's use `as_tibble()` on the `mtcars` data set. Save this new data set as `mtcars_tibble`. Check your environment to see if it worked!
 
 ```{r}
-
+mtcars_tibble <- as_tibble(mtcars, rownames = "car_names")
+mtcars_tibble
 ```
 
 # Part 2: Data Manipulation with `dplyr`
@@ -79,7 +89,8 @@ glimpse(flights)
 Select only the `carrier`, `origin`, `dest`, and `air_time` columns from `flights`.
 
 ```{r}
-
+flights |>
+  select(carrier, origin, dest, air_time)
 ```
 
 ### Question 2
@@ -87,7 +98,10 @@ Select only the `carrier`, `origin`, `dest`, and `air_time` columns from `flight
 Make a data frame that keeps every variable except `dep_delay`. Call the new data frame `new.data`.
 
 ```{r}
+new.data <- flights |>
+  select(-dep_delay)
 
+new.data
 ```
 
 ### Question 3
@@ -95,7 +109,8 @@ Make a data frame that keeps every variable except `dep_delay`. Call the new dat
 Use `select()` with a range (`:`) to keep all columns from `year` through `arr_delay` (inclusive). These are the scheduling and delay variables.
 
 ```{r}
-
+flights |>
+  select(year:arr_delay)
 ```
 
 ### Question 4
@@ -103,7 +118,8 @@ Use `select()` with a range (`:`) to keep all columns from `year` through `arr_d
 Use `select()` with the `contains()` helper to keep only columns whose name includes the string `"dep_"`. What columns do you get?
 
 ```{r}
-
+flights |>
+  select(contains("dep_"))
 ```
 
 ## 2.2 `filter()` — Choosing Rows
@@ -113,7 +129,8 @@ Use `select()` with the `contains()` helper to keep only columns whose name incl
 Filter `flights` to only include flights that departed from JFK airport.
 
 ```{r}
-
+flights |>
+  filter(origin == "JFK")
 ```
 
 ### Question 6
@@ -121,8 +138,15 @@ Filter `flights` to only include flights that departed from JFK airport.
 What if we want to look at destinations of RDU and JFK that had a departure delay greater than 60 minutes? Write the code below to do this...
 
 ```{r}
-
+flights |>
+  filter(origin %in% c("RDU", "JFK"), dep_delay > 60)
 ```
+
+```{r}
+flights |>
+  filter(origin == c("RDU", "JFK"), dep_delay > 60)
+```
+
 
 Why `c`?
 
@@ -135,7 +159,9 @@ What happens if we change %in% to == ?
 Arrange the `flights` data by `dep_delay` in descending order so the most delayed flights appear at the top. What is the longest departure delay, and what carrier operated that flight?
 
 ```{r}
-
+flights |>
+  arrange(desc(dep_delay)) |>
+  select(carrier, flight, dep_delay)
 ```
 
 ## 2.4 Chaining: `filter()` + `arrange()` + `select()`
@@ -151,7 +177,10 @@ Create a data frame that:
 What is the tail number of the most delayed flight to RDU?
 
 ```{r}
-
+flights |>
+  filter(dest == "RDU") |>
+  arrange(desc(dep_delay)) |>
+  select(tailnum, carrier, dep_delay, arr_delay)
 ```
 
 ## 2.5 `mutate()` — Creating New Variables
@@ -161,7 +190,9 @@ What is the tail number of the most delayed flight to RDU?
 Create a new variable `speed_mph` that gives the average speed of each flight in miles per hour. Recall that `air_time` is in minutes and `distance` is in miles. Keep only `flight`, `carrier`, `distance`, `air_time`, and `speed_mph`.
 
 ```{r}
-
+flights |>
+  mutate(speed_mph = distance/ (air_time/60)) |>
+  select(flight, carrier, distance, air_time, speed_mph)
 ```
 
 ### Question 10
@@ -169,8 +200,10 @@ Create a new variable `speed_mph` that gives the average speed of each flight in
 Use `mutate()` and `ifelse()` to create a new column `on_time` that is `"On Time"` if `arr_delay <= 0` and `"Late"` otherwise. Then use `count()` to find how many flights fall into each category.
 
 ```{r}
-
-
+flights |>
+  mutate(on_time = ifelse(arr_delay <= 0, "On time", "Late")) |>
+  drop_na(on_time) |>
+  count(on_time)
 ```
 
 ## 2.6 `group_by()` + `summarise()` — Summary Statistics by Group
@@ -180,7 +213,11 @@ Use `mutate()` and `ifelse()` to create a new column `on_time` that is `"On Time
 Find the **mean and standard deviation of departure delay** for each carrier. Arrange the result by mean departure delay in descending order. Which carrier has the worst average departure delay?
 
 ```{r}
-
+flights |>
+  group_by(carrier) |>
+  summarise(mean_depdelay = mean(dep_delay, na.rm = TRUE),
+            sd_depdelay = sd(dep_delay, na.rm = TRUE)) |>
+  arrange(desc(mean_depdelay))
 ```
 
 ### Question 12 (Challenge)
@@ -194,7 +231,14 @@ For each month, compute:
 Which month has the highest proportion of on-time arrivals?
 
 ```{r}
-
+flights |>
+  group_by(month) |>
+  summarise(
+    n_flights = n(),
+    mean_arr_delay = mean(arr_delay, na.rm = T),
+    prop_on_time = mean(arr_delay <= 0, na.rm = T)
+  ) |>
+  arrange(desc(prop_on_time))
 
 ```
 
@@ -220,7 +264,14 @@ delay_summary
 Pivot `delay_summary` so that each row is a **carrier** and there is one column per month (`month_1`, `month_2`, `month_3`). Save this as `delay_wide`.
 
 ```{r}
+delay_wide <- delay_summary |>
+  pivot_wider(
+    names_from = month,
+    values_from = mean_arr_delay,
+    names_prefix = "month_",
+  )
 
+delay_wide
 ```
 
 ## 3.2 `pivot_longer()` — Wide to Long
@@ -230,7 +281,14 @@ Pivot `delay_summary` so that each row is a **carrier** and there is one column 
 Take `delay_wide` and pivot it back to long format so that we have columns `carrier`, `month`, and `mean_arr_delay`. The result should match the original `delay_summary`.
 
 ```{r}
-
+delay_wide |>
+  pivot_longer(
+    cols = starts_with("month_"),
+    names_to = "month", 
+    values_to = "mean_arr_delay",
+    names_prefix = "month_",
+    names_transform = list(month = as.integer)
+  )
 ```
 
 ## 3.3 Putting It All Together
