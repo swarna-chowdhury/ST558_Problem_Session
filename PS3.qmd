@@ -48,7 +48,7 @@ Always inspect your data after reading it in. Unexpected character types are oft
 
 ## 1.2 Tibble vs. Data Frame
 
-Before we dive into manipulation, let's quickly note that `read_csv()` and `read_delim()` return **tibbles**, not plain data frames. Tibbles are a tidyverse-friendly version of a data frame with some helpful differences:
+Before we dive into manipulation, let's quickly note that `read_delim()`/any reading functions from readr package return **tibbles**, not plain data frames. Tibbles are a tidyverse-friendly version of a data frame with some helpful differences:
 
 -   They print only the first 10 rows and as many columns as fit on screen.
 -   They never silently convert strings to factors.
