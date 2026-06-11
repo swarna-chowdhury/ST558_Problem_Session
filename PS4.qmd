@@ -25,7 +25,7 @@ We'll work with two datasets today:
 We'll use the `flights` dataset to practice creating contingency tables. First, use `glimpse()` to remind yourself what variables are available.
 
 ```{r}
-
+glimpse(flights)
 ```
 
 ## One-way table
@@ -34,10 +34,12 @@ Create a one-way contingency table showing the number of flights from each `orig
 
 ```{r}
 # Base R
-
+table(flights$origin)
 
 # tidyverse
-
+flights |>
+  group_by(origin) |>
+  summarise(count = n())
 
 ```
 
@@ -46,7 +48,13 @@ Create a one-way contingency table showing the number of flights from each `orig
 Now cross `origin` with `carrier`. Use `group_by()` + `summarise()` and then `pivot_wider()` to display it in wide format with carriers across the top.
 
 ```{r}
+table(flights$carrier)
+table(flights$origin)
 
+flights |> 
+  group_by(origin, carrier) |>
+  summarise(count = n(), .groups = "drop") |>
+  pivot_wider(names_from = carrier, values_from = count, values_fill = 0)
 ```
 
 # Numerical Summaries
@@ -56,13 +64,22 @@ Let's use the `penguins` dataset to practice numerical summaries.
 Compute the mean and standard deviation of `body_mass_g` for each species. Don't forget to handle missing values!
 
 ```{r}
-
+penguins |>
+  group_by(species) |>
+  summarise(mean = mean(body_mass_g, na.rm = T),
+            sd = sd(body_mass_g, na.rm = T))
 ```
 
 Now extend this using `across()` to compute the same statistics for all numeric columns at once, still grouped by species.
 
 ```{r}
-
+penguins |>
+  group_by(species) |>
+  summarise(across(where(is.numeric), 
+    list(mean = ~ mean(.x, na.rm =T),
+         sd= ~sd(.x, na.rm = T)), 
+    .names = "{.fn}_{.col}"
+  ))
 ```
 
 # ggplot
@@ -74,7 +91,11 @@ Now let's explore the `penguins` dataset with some plots.
 Make a histogram of penguin body mass. Set an appropriate binwidth. Pull up the help file for `geom_histogram()` if you need a reminder on the argument name.
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = body_mass_g)) +
+  geom_histogram(binwidth = 200) +
+  labs(x = "Body Mass (g)", y = "Count",
+       title = "Distribution of Penguin Body Mass")
 ```
 
 ## Scatterplot
@@ -82,7 +103,15 @@ Make a histogram of penguin body mass. Set an appropriate binwidth. Pull up the 
 Create a scatterplot of `body_mass_g` (x) vs. `flipper_length_mm` (y).
 
 ```{r}
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm)) +
+  geom_point()
+```
 
+```{r}
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter()
 ```
 
 Note: aesthetic is a visual property of one of the objects in your plot. Aesthetic options are:
@@ -105,6 +134,13 @@ What if your legend goes off the page (this may be an issue on your project...)?
 
 Talk through what each part of this code is doing, then add it to your scatterplot above.
 
+```{r}
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter() +
+  guides(color = guide_legend(ncol = 2))
+```
+
 For an additional resource, see [here](https://www.tidyverse.org/blog/2024/02/ggplot2-3-5-0-legends/).
 
 ## Labels
@@ -124,7 +160,11 @@ Good labels are critical for making your plots accessible to a wider audience. A
 -- caption
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter() +
+  labs(x = "Body Mass (g)", y = "Flipper Length (mm)", color = "Species", 
+       title = "Scatterplot of Body Mass vs Flipper Length by Species")
 ```
 
 What if your axis labels are long? Sometimes it's better to rotate them! We can do that using the `theme()` function:
@@ -132,13 +172,23 @@ What if your axis labels are long? Sometimes it's better to rotate them! We can 
 `theme(axis.text.x = element_text(angle = 90, vjust = 0.5))`
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter() +
+  labs(x = "Body Mass (g)", y = "Flipper Length (mm)", color = "Species", 
+       title = "Scatterplot of Body Mass vs Flipper Length by Species") +
+  theme(axis.text.x = element_text(angle = 90, vjust= 0.5))
 ```
 
 What if your title is too long? We can fix this by putting `\n` in your title text. Try it!
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter() +
+  labs(x = "Body Mass (g)", y = "Flipper Length (mm)", color = "Species", 
+       title = "Scatterplot of Body Mass vs \nFlipper Length by Species") +
+  theme(axis.text.x = element_text(angle = 90, vjust= 0.5))
 ```
 
 ## Custom Themes
@@ -155,6 +205,16 @@ wolftheme <- theme(
 )
 
 # save your scatterplot as an R object and add the wolf theme to it using +
+```
+
+```{r}
+p <- penguins |>
+  ggplot(aes(x = body_mass_g, y = flipper_length_mm, color = species)) +
+  geom_jitter() +
+  labs(x = "Body Mass (g)", y = "Flipper Length (mm)", color = "Species", 
+       title = "Scatterplot of Body Mass vs \nFlipper Length by Species")
+
+p + wolftheme
 ```
 
 # Break Apart a Plot by a Variable
@@ -174,7 +234,10 @@ Run `?facet_wrap` in your console to see the name of the row and column argument
 Add `facet_wrap()` as a layer below, breaking the plot apart by species.
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = body_mass_g, fill = species)) +
+  geom_histogram(binwidth = 200, alpha = 0.5) +
+  facet_wrap(~species, ncol = 3)
 ```
 
 ## Break Apart by More Than One Variable
@@ -182,13 +245,18 @@ Add `facet_wrap()` as a layer below, breaking the plot apart by species.
 Now let's make a scatterplot between `bill_length_mm` and `bill_depth_mm`. Color the points by species and shape the points by island.
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = bill_length_mm, y = bill_depth_mm, color = species, shape = island)) +
+  geom_point(alpha = 0.7)
 ```
 
 Here, we are going to introduce `facet_grid()`. It's a lot like `facet_wrap()`, but allows us to break our plots apart by more than one variable. The syntax for `facet_grid()` is `variable1 ~ variable2`. Try breaking the plot above by both species AND island.
 
 ```{r}
-
+penguins |>
+  ggplot(aes(x = bill_length_mm, y = bill_depth_mm, color = species, shape = island)) +
+  geom_point(alpha = 0.7) +
+  facet_grid(species ~ island)
 ```
 
 For more information on the difference, please reference this [stackoverflow link](https://stackoverflow.com/questions/20457905/whats-the-difference-between-facet-wrap-and-facet-grid-in-ggplot2).
@@ -218,7 +286,7 @@ penguins |>
 
 # Recreating a Plot
 
-Let's start by reading in some data from a URL. This is a `.csv` file so it is a comma delimited file. Opening it, we saw that there is a header row and some missing values. But it seems like it should read in just fine with `read_csv()`.
+Let's start by reading in some data from a URL <https://www4.stat.ncsu.edu/~online/datasets/sleep_data.csv>. This is a `.csv` file so it is a comma delimited file. Opening it, we saw that there is a header row and some missing values. But it seems like it should read in just fine with `read_csv()`.
 
 ```{r}
 
