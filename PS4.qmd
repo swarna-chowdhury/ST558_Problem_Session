@@ -1,0 +1,231 @@
+---
+title: "Problem Session 4"
+subtitle: "Exploratory Data Analysis"
+format: html
+editor: visual
+---
+
+# Packages
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(palmerpenguins)
+library(nycflights13)
+```
+
+We'll work with two datasets today:
+
+-   `penguins` from `palmerpenguins` — measurements on 344 penguins across three species
+-   `flights` from `nycflights13` — over 300,000 flights departing NYC in 2013
+
+# Contingency Table
+
+We'll use the `flights` dataset to practice creating contingency tables. First, use `glimpse()` to remind yourself what variables are available.
+
+```{r}
+
+```
+
+## One-way table
+
+Create a one-way contingency table showing the number of flights from each `origin` airport. Try both the Base R `table()` approach and the tidyverse approach.
+
+```{r}
+# Base R
+
+
+# tidyverse
+
+
+```
+
+## Two-way table
+
+Now cross `origin` with `carrier`. Use `group_by()` + `summarise()` and then `pivot_wider()` to display it in wide format with carriers across the top.
+
+```{r}
+
+```
+
+# Numerical Summaries
+
+Let's use the `penguins` dataset to practice numerical summaries.
+
+Compute the mean and standard deviation of `body_mass_g` for each species. Don't forget to handle missing values!
+
+```{r}
+
+```
+
+Now extend this using `across()` to compute the same statistics for all numeric columns at once, still grouped by species.
+
+```{r}
+
+```
+
+# ggplot
+
+Now let's explore the `penguins` dataset with some plots.
+
+## Histogram
+
+Make a histogram of penguin body mass. Set an appropriate binwidth. Pull up the help file for `geom_histogram()` if you need a reminder on the argument name.
+
+```{r}
+
+```
+
+## Scatterplot
+
+Create a scatterplot of `body_mass_g` (x) vs. `flipper_length_mm` (y).
+
+```{r}
+
+```
+
+Note: aesthetic is a visual property of one of the objects in your plot. Aesthetic options are:
+
+-- shape
+
+-- color
+
+-- size
+
+-- fill
+
+**Question**: What happens if we put `color` as an argument directly in our `geom` instead of inside `aes()`? Try setting `color = "blue"` inside `geom_point()`, then try mapping `color = species` inside `aes()`. What's the difference?
+
+## Formatting
+
+What if your legend goes off the page (this may be an issue on your project...)? We can use the `guides()` function to control it. Try adding the following to your scatterplot:
+
+`guides(color = guide_legend(ncol = 2))`
+
+Talk through what each part of this code is doing, then add it to your scatterplot above.
+
+For an additional resource, see [here](https://www.tidyverse.org/blog/2024/02/ggplot2-3-5-0-legends/).
+
+## Labels
+
+Good labels are critical for making your plots accessible to a wider audience. Always ensure the axis and legend labels display the full variable name.
+
+`labs()` is the function. Common arguments to set are:
+
+-- x
+
+-- y
+
+-- title
+
+-- subtitle
+
+-- caption
+
+```{r}
+
+```
+
+What if your axis labels are long? Sometimes it's better to rotate them! We can do that using the `theme()` function:
+
+`theme(axis.text.x = element_text(angle = 90, vjust = 0.5))`
+
+```{r}
+
+```
+
+What if your title is too long? We can fix this by putting `\n` in your title text. Try it!
+
+```{r}
+
+```
+
+## Custom Themes
+
+We can use the `theme()` function for a lot of things — font, color, bold text, and more. One powerful trick: we can save a theme as an R object and add it to any plot with `+`.
+
+```{r}
+wolftheme <- theme(
+  plot.title   = element_text(family = "Helvetica", face = "bold", size = 20),
+  legend.title = element_text(colour = "red", face = "bold.italic", family = "Helvetica"),
+  legend.text  = element_text(face = "italic", colour = "darkred", family = "Helvetica"),
+  axis.title   = element_text(family = "Helvetica", size = 10, colour = "darkred"),
+  axis.text    = element_text(family = "Courier", colour = "black", size = 10)
+)
+
+# save your scatterplot as an R object and add the wolf theme to it using +
+```
+
+# Break Apart a Plot by a Variable
+
+Consider this histogram below:
+
+```{r}
+penguins |>
+  ggplot(aes(x = body_mass_g, fill = species)) +
+  geom_histogram(binwidth = 200, alpha = 0.5)
+```
+
+What if we don't want the overlap? We can use `facet_wrap()` to split the plot into panels! This function takes the name of the variable you want to split by, and how many cols/rows you want. Note: the syntax for this function is `~variable.name`.
+
+Run `?facet_wrap` in your console to see the name of the row and column arguments.
+
+Add `facet_wrap()` as a layer below, breaking the plot apart by species.
+
+```{r}
+
+```
+
+## Break Apart by More Than One Variable
+
+Now let's make a scatterplot between `bill_length_mm` and `bill_depth_mm`. Color the points by species and shape the points by island.
+
+```{r}
+
+```
+
+Here, we are going to introduce `facet_grid()`. It's a lot like `facet_wrap()`, but allows us to break our plots apart by more than one variable. The syntax for `facet_grid()` is `variable1 ~ variable2`. Try breaking the plot above by both species AND island.
+
+```{r}
+
+```
+
+For more information on the difference, please reference this [stackoverflow link](https://stackoverflow.com/questions/20457905/whats-the-difference-between-facet-wrap-and-facet-grid-in-ggplot2).
+
+## Fill vs. Color
+
+Change `fill` to `color` below and re-run the code. What happened?
+
+```{r}
+penguins |>
+  ggplot(aes(x = body_mass_g, fill = species)) +
+  geom_histogram(binwidth = 200, alpha = 0.7) +
+  facet_wrap(~species, nrow = 3)
+```
+
+Generally, `fill` defines the color *inside* a geom, whereas `color` defines the color of the *outline*. However, there is one exception to the rule... points!
+
+Most points plotted are considered too small to have meaningful area inside, so `fill` won't work! Try it below:
+
+```{r}
+penguins |>
+  ggplot(aes(x = bill_length_mm, y = bill_depth_mm, color = species)) + 
+  geom_point()
+```
+
+`fill` and `color` do act differently when points have a "border". Shapes 21–25 are shapes that have a border. Use the `shape` argument within `geom_point()` to change the shape, and see how it interacts with `fill` and `color`.
+
+# Recreating a Plot
+
+Let's start by reading in some data from a URL. This is a `.csv` file so it is a comma delimited file. Opening it, we saw that there is a header row and some missing values. But it seems like it should read in just fine with `read_csv()`.
+
+```{r}
+
+```
+
+The file at <https://www4.stat.ncsu.edu/~online/datasets/sleep_data_info.txt> gives the reference for where this data comes from. Let's recreate the first plot (almost) that we see in that paper.
+
+```{r}
+
+```
