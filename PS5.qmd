@@ -18,7 +18,11 @@ library(nycflights13)
 We'll start by practicing `apply()` on the `penguins` data set from the `palmerpenguins` package. Our goal is to compute a custom summary for each numeric variable: we want the mean, standard deviation, and the range (max - min).
 
 ```{r}
-
+apply(X = penguins |> select(where(is.numeric)), 
+      MARGIN = 2,
+      FUN = function(x) {
+        c(mean = mean(x, na.rm= T), sd = sd(x, na.rm = T), range = max(x, na.rm = T)-min(x, na.rm = T))
+      })
 ```
 
 ### `lapply()` and `sapply()` with a List of Data Frames
@@ -37,21 +41,20 @@ flights_list <- list(
 **Part A:** Use `lapply()` to compute the column means for each data frame in `flights_list`. What is the structure of the output?
 
 ```{r}
-
+lapply(flights_list, colMeans, na.rm= T)
 ```
 
 **Part B:** Now use `sapply()` to do the same thing. How does the output differ from `lapply()`?
 
 ```{r}
-
+sapply(flights_list, colMeans, na.rm = T)
 ```
 
 **Part C:** Using `sapply()`, write a single-line call that returns, for each carrier, the proportion of flights with a departure delay greater than 15 minutes. Use an anonymous function inside `sapply()`.
 
 ```{r}
-
+sapply(flights_list, function(df) {mean(df$dep_delay >15, na.rm = T)})
 ```
-
 
 ### `tapply()`: Grouped Summaries
 
@@ -65,13 +68,23 @@ tapply(X, INDEX, FUN, ...)
 
 where `X` is the vector of values, `INDEX` is the grouping factor (or list of factors), and `FUN` is the function to apply.
 
-**Your turn:** Using `tapply()` on the `penguins` data, compute the mean body mass (in grams) for each combination of `species` and `island`. 
+**Your turn:** Using `tapply()` on the `penguins` data, compute the mean body mass (in grams) for each combination of `species` and `island`.
 
 ```{r}
-
+tapply(X = penguins$body_mass_g,
+       INDEX = list(penguins$species, penguins$island),
+       FUN = mean,
+       na.rm = T)
 ```
 
 After you have the result, think about what type of object `tapply()` returns when two grouping factors are provided. How does this compare to a `group_by() |> summarize()` approach?
+
+```{r}
+penguins |>
+  group_by(species, island) |>
+  summarise(mean = mean(body_mass_g, na.rm= T))
+```
+
 
 ## `purrr`
 
@@ -84,7 +97,9 @@ We'll use the same `flights_list` from above.
 **Part A:** Use `map()` to compute the column means for each carrier data frame. Then use `map_dbl()` to extract just the mean `arr_delay` for each carrier in a single step.
 
 ```{r}
+map(flights_list, colMeans, na.rm = T)
 
+map_dbl(flights_list, \(df) mean(df$arr_delay, na.rm = T))
 ```
 
 **Part B:** Use `map2()` to compute, for each carrier, the difference between mean arr_delay and mean dep_delay. In other words, on average, do flights make up time in the air, or do delays compound?
@@ -92,8 +107,17 @@ We'll use the same `flights_list` from above.
 *Hint:* You'll need to supply two lists: one containing the mean `arr_delay` for each carrier and one containing the mean `dep_delay`. Or you can work directly with `flights_list` and a two-argument anonymous function.
 
 ```{r}
-
+map2_dbl(
+  map_dbl(flights_list, \(df) mean(df$arr_delay, na.rm = T)),
+  map_dbl(flights_list, \(df) mean(df$dep_delay, na.rm = T)),
+  \(arr, dep) arr -dep
+)
 ```
+
+```{r}
+map_dbl(flights_list, \(df) {mean(df$arr_delay, na.rm = T) - mean(df$dep_delay, na.rm = T)})
+```
+
 
 ### `map_dfr()` and Combining Results
 
@@ -111,6 +135,20 @@ For this exercise, work through the following three steps:
 
 ```{r}
 
+# Helper Function
+
+get_numeric_means <- function(df) {
+  df |> 
+    select(where(is.numeric)) |>
+    summarise(across(everything(), \(x) mean(x, na.rm = T)))
+}
+
+map_dfr(flights_list, get_numeric_means) |>
+  mutate(group = 1:2) |>
+  pivot_longer(cols = 1:4,
+               names_to = "variable",
+               values_to = "mean_value")
+
 ```
 
 ## Advanced Function Writing
@@ -125,13 +163,25 @@ Requirements:
 -   Use `stop()` to throw an informative error if the input is not a data frame.
 
 ```{r}
+inherits(penguins, "vector")
 
+scale_numeric_cols <- function(.df){
+  if(!inherits(.df, "data.frame")) {
+    stop("Input must be a data frame or a tibble")
+  }
+  
+  .df |>
+    mutate(across(where(is.numeric), \(x) (x - mean(x, na.rm = T))/ sd(x, na.rm = T)))
+}
 ```
 
 Test it:
 
 ```{r}
+penguins |>
+  scale_numeric_cols()
 
+# scale_numeric_cols(c(1:3))
 ```
 
 ### Read Through a Function: `enquo()`, `!!`, and `as_label()`
