@@ -1,0 +1,172 @@
+---
+title: "Problem Session 5"
+subtitle: "apply, purrr, and Advanced Function Writing"
+format: html
+editor: visual
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(palmerpenguins)
+library(nycflights13)
+```
+
+## The `apply()` Family
+
+### `apply()` and Anonymous Functions with `penguins`
+
+We'll start by practicing `apply()` on the `penguins` data set from the `palmerpenguins` package. Our goal is to compute a custom summary for each numeric variable: we want the mean, standard deviation, and the range (max - min).
+
+```{r}
+
+```
+
+### `lapply()` and `sapply()` with a List of Data Frames
+
+Below we create a list containing two subsets of the `flights` data: one for carrier `"UA"` (United Airlines) and one for `"DL"` (Delta). Both subsets contain only the numeric columns relevant to departure and arrival performance.
+
+```{r}
+flights_list <- list(
+  UA = flights |> filter(carrier == "UA") |>
+         select(dep_delay, arr_delay, air_time, distance),
+  DL = flights |> filter(carrier == "DL") |>
+         select(dep_delay, arr_delay, air_time, distance)
+)
+```
+
+**Part A:** Use `lapply()` to compute the column means for each data frame in `flights_list`. What is the structure of the output?
+
+```{r}
+
+```
+
+**Part B:** Now use `sapply()` to do the same thing. How does the output differ from `lapply()`?
+
+```{r}
+
+```
+
+**Part C:** Using `sapply()`, write a single-line call that returns, for each carrier, the proportion of flights with a departure delay greater than 15 minutes. Use an anonymous function inside `sapply()`.
+
+```{r}
+
+```
+
+
+### `tapply()`: Grouped Summaries
+
+`tapply()` is a member of the apply family that often flies under the radar. It lets you apply a function to subsets of a vector, where the subsets are defined by a grouping factor — essentially a base R version of `group_by() |> summarize()`.
+
+The syntax is:
+
+```         
+tapply(X, INDEX, FUN, ...)
+```
+
+where `X` is the vector of values, `INDEX` is the grouping factor (or list of factors), and `FUN` is the function to apply.
+
+**Your turn:** Using `tapply()` on the `penguins` data, compute the mean body mass (in grams) for each combination of `species` and `island`. 
+
+```{r}
+
+```
+
+After you have the result, think about what type of object `tapply()` returns when two grouping factors are provided. How does this compare to a `group_by() |> summarize()` approach?
+
+## `purrr`
+
+### `map()` and `map_dbl()` on a List
+
+Let's practice with `purrr`'s `map()` family, which gives us a more consistent and expressive alternative to `lapply()` and `sapply()`.
+
+We'll use the same `flights_list` from above.
+
+**Part A:** Use `map()` to compute the column means for each carrier data frame. Then use `map_dbl()` to extract just the mean `arr_delay` for each carrier in a single step.
+
+```{r}
+
+```
+
+**Part B:** Use `map2()` to compute, for each carrier, the difference between mean arr_delay and mean dep_delay. In other words, on average, do flights make up time in the air, or do delays compound?
+
+*Hint:* You'll need to supply two lists: one containing the mean `arr_delay` for each carrier and one containing the mean `dep_delay`. Or you can work directly with `flights_list` and a two-argument anonymous function.
+
+```{r}
+
+```
+
+### `map_dfr()` and Combining Results
+
+Now let's introduce a particularly useful function from `purrr`: `map_dfr()`. One nice feature of `purrr` over base R's apply family is that we have direct control over the output format. The `dfr` in `map_dfr()` stands for "data frame, row-bound" — it applies a function to each element of a list and automatically stacks the results into a single tibble by binding rows.
+
+Because we're working with data frames in our list, it may (or may not) be logical that we want to combine everything into one working data frame. We'll use the `flights_list` from above.
+
+For this exercise, work through the following three steps:
+
+-- Use `map_dfr()` to calculate the column means for all numeric variables in each data frame in `flights_list`.
+
+-- Create a new variable called `group` that identifies which list element each row came from — values should be `1` for UA and `2` for DL.
+
+-- Pivot the resulting data set into a longer form that would be better suited for plotting or modeling (one row per carrier–variable combination).
+
+```{r}
+
+```
+
+## Advanced Function Writing
+
+### Writing a Pipeable `tidyverse`-Style Function
+
+Write a function called `scale_numeric_cols()` that takes a data frame `.df` and returns the same data frame with all numeric columns standardized (mean 0, SD 1). The function should use `mutate()` and `across()` internally.
+
+Requirements:
+
+-   The function should work in a pipeline.
+-   Use `stop()` to throw an informative error if the input is not a data frame.
+
+```{r}
+
+```
+
+Test it:
+
+```{r}
+
+```
+
+### Read Through a Function: `enquo()`, `!!`, and `as_label()`
+
+Below is a function that computes a grouped numeric summary and names the output column dynamically based on the column name the user passes. Read through it carefully and add comments explaining what each non-obvious line does.
+
+Pay special attention to:
+
+-   Why we need `enquo()` and `!!`
+-   What `as_label()` gives us
+-   The walrus operator `:=`
+
+```{r}
+library(tidyverse)
+
+grouped_summary <- function(.df, group_var, numeric_var, na.rm = TRUE) {
+
+  if (!inherits(.df, "data.frame")) {
+    stop("'.df' must be a data frame or tibble.")
+  }
+
+  group_expr   <- enquo(group_var)      # ???
+  numeric_expr <- enquo(numeric_var)    # ???
+
+  col_label <- paste0("mean_", as_label(numeric_expr))  # ???
+
+  .df |>
+    filter(!is.na(!!numeric_expr)) |>           # ???
+    group_by(!!group_expr) |>                   # ???
+    summarize(
+      n             = n(),
+      !!(col_label) := mean(!!numeric_expr, na.rm = na.rm)  # ???
+    )
+}
+
+grouped_summary(penguins, species, body_mass_g)
+grouped_summary(flights, carrier, dep_delay)
+```
