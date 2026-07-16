@@ -1,0 +1,186 @@
+---
+title: "Problem Session 6"
+subtitle: "Predictive Modeling with `tidymodels`"
+format: html
+editor: visual
+---
+
+## Packages
+
+```{r}
+#| message: false
+library(tidyverse)
+library(tidymodels)
+library(palmerpenguins)
+```
+
+## The data
+
+We'll work with the `penguins` data from the `palmerpenguins` package: 344 penguins measured across three species on three islands in the Palmer Archipelago.
+
+Our goal today is prediction. We want to predict a penguin's `body_mass_g` from its other measurements, and we want to be able to say — with a straight face — why we chose the model we chose.
+
+There are a handful of missing values. Dropping them is a non-learned transformation (it doesn't depend on estimating anything from the data), so we do it before we hand anything to `tidymodels`.
+
+```{r}
+pen <- penguins |>
+  drop_na()
+
+summary(pen)
+```
+
+**Discussion.** Why does it matter that dropping `NA`s happens outside the `tidymodels` machinery, while something like centering and scaling should happen inside it (via a recipe)?
+
+## Plot first, model second
+
+Before we fit anything, let's look.
+
+```{r}
+glimpse(penguins)
+```
+
+Our first candidate predictor is `flipper_length_mm`.
+
+Fill in the code below to plot `body_mass_g` against `flipper_length_mm`, then add a second version colored by `species` with a linear smooth for each.
+
+```{r}
+# plot 1: mass vs flipper
+
+
+# plot 2: same thing, colored by species
+
+
+```
+
+**Discussion.** In the second plot, the three fitted lines are roughly parallel but sit at different heights. Translate that sentence into a model. What would the picture have to look like for an interaction between `flipper_length_mm` and `species` to be worth fitting?
+
+Now let's add `sex` to the picture.
+
+```{r}
+ggplot(pen, aes(x = flipper_length_mm, y = body_mass_g, color = sex)) +
+  geom_point(alpha = 0.7) +
+  facet_wrap(~ species) +
+  labs(x = "Flipper length (mm)", y = "Body mass (g)", color = "Sex")
+```
+
+**Discussion.** Does `sex` look like it belongs in the model? As what — an intercept shift, or something more?
+
+## An aside that should make you think
+
+Let's look at a different predictor: `bill_depth_mm`.
+
+```{r}
+ggplot(pen, aes(x = bill_depth_mm, y = body_mass_g)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE, color = "black") +
+  labs(x = "Bill depth (mm)", y = "Body mass (g)")
+
+ggplot(pen, aes(x = bill_depth_mm, y = body_mass_g, color = species)) +
+  geom_point(alpha = 0.7) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "Bill depth (mm)", y = "Body mass (g)", color = "Species")
+```
+
+**Discussion.** The overall trend and the within-species trends point in opposite directions. What's going on, and what does it tell you about fitting `body_mass_g ~ bill_depth_mm` and calling it a day?
+
+## Train/test split
+
+We'll hold out 20% of the data to test on, and use the other 80% to train.
+
+We can do this by hand with `sample_n()`. But `rsample::initial_split()` does the same job, plus one extra thing:
+
+```{r}
+set.seed(558)
+
+pen_split <- initial_split(pen, prop = 0.8, strata = species)
+pen_train <- training(pen_split)
+pen_test  <- testing(pen_split)
+
+# check the species breakdown in each
+```
+
+Fill in the check below.
+
+**Discussion.** What does `strata = species` do, and why would you want it here rather than a plain random sample?
+
+## Four candidate models
+
+Our plots suggested four models worth putting head-to-head. We'll express the preprocessing for each as a "recipe".
+
+```{r}
+rec_slr <- recipe(body_mass_g ~ flipper_length_mm, data = pen_train)
+
+rec_add <- recipe(body_mass_g ~ flipper_length_mm + species + sex,
+                  data = pen_train) |>
+  step_dummy(species, sex)
+```
+
+Before writing the interaction recipe, let's find out what the dummy columns are actually named. `prep()` estimates whatever the recipe needs from the training data; `bake()` applies it.
+
+```{r}
+rec_add |>
+  prep(training = pen_train) |>
+  bake(pen_train) |>
+  names()
+```
+
+Given those names, write the interaction recipe.
+
+```{r}
+# rec_int <- ...
+
+
+```
+
+Finally, a curvature model. Mass grows with flipper length, but there's no law saying it grows linearly — let's give it the option.
+
+```{r}
+# rec_quad <- ...
+```
+
+Now the model spec and the four workflows. All four use the same `parsnip` spec — that's the point of separating the recipe from the model.
+
+```{r}
+
+```
+
+## Cross-validation on the training set
+
+Ten folds, on the training set only.
+
+```{r}
+set.seed(558)
+pen_folds <- vfold_cv(pen_train, v = 10)
+```
+
+Fit each workflow to the resamples and collect the metrics into one comparison table.
+
+```{r}
+# fit_resamples() each workflow, then bind_rows() the collect_metrics() output
+
+
+```
+
+**Discussion 1.** Why did we run CV on the training set instead of on all of `pen`?
+
+**Discussion 2.** The interaction model is strictly more flexible than the additive model — it contains the additive model as a special case (set the interaction coefficients to zero). So it can never fit the training data worse. Why doesn't it automatically win here?
+
+**Discussion 3.** Look at the `std_err` column, not just `mean`. Does the gap between the top few models look big compared to their standard errors? What should you do when two models are within a standard error of each other?
+
+## One look at the test set
+
+Commit to a model, then use `last_fit()` on the original split object.
+
+```{r}
+
+```
+
+Now pull out the coefficients.
+
+```{r}
+
+```
+
+**Discussion.** Interpret the `species_Gentoo` coefficient. What is it a comparison to, and where in the output is that baseline?
+
+**Discussion.** Compare the test RMSE to the CV RMSE for this model. Suppose the test RMSE had come out noticeably worse than the CV estimate. Would you be allowed to go back and try the interaction model on the test set?
