@@ -9,6 +9,7 @@ editor: visual
 
 ```{r}
 #| message: false
+#| warning: false
 library(tidyverse)
 library(tidymodels)
 library(palmerpenguins)
@@ -23,6 +24,8 @@ Our goal today is prediction. We want to predict a penguin's `body_mass_g` from 
 There are a handful of missing values. Dropping them is a non-learned transformation (it doesn't depend on estimating anything from the data), so we do it before we hand anything to `tidymodels`.
 
 ```{r}
+summary(penguins)
+
 pen <- penguins |>
   drop_na()
 
@@ -46,10 +49,17 @@ Fill in the code below to plot `body_mass_g` against `flipper_length_mm`, then a
 ```{r}
 # plot 1: mass vs flipper
 
+ggplot(pen, aes(x = flipper_length_mm, y = body_mass_g)) +
+  geom_point(alpha= 0.7) +
+  geom_smooth(method= "lm", se = F) +
+  labs(x = "Flipper Length (mm)", y = "Body Mass (g)")
 
 # plot 2: same thing, colored by species
 
-
+ggplot(pen, aes(x = flipper_length_mm, y = body_mass_g, color = species)) +
+  geom_point(alpha= 0.7) +
+  geom_smooth(method= "lm", se = F) +
+  labs(x = "Flipper Length (mm)", y = "Body Mass (g)", color = "Species")
 ```
 
 **Discussion.** In the second plot, the three fitted lines are roughly parallel but sit at different heights. Translate that sentence into a model. What would the picture have to look like for an interaction between `flipper_length_mm` and `species` to be worth fitting?
@@ -97,6 +107,12 @@ pen_train <- training(pen_split)
 pen_test  <- testing(pen_split)
 
 # check the species breakdown in each
+
+bind_rows(
+  pen_train |> count(species) |> mutate(set = "train"), 
+  pen_test |> count(species) |> mutate(set = "test")
+) |>
+  pivot_wider(names_from = set, values_from = n)
 ```
 
 Fill in the check below.
@@ -127,21 +143,29 @@ rec_add |>
 Given those names, write the interaction recipe.
 
 ```{r}
-# rec_int <- ...
-
-
+rec_int <- recipe(body_mass_g ~ flipper_length_mm +species+sex, data = pen_train) |>
+  step_dummy(species, sex) |>
+  step_interact(terms = ~flipper_length_mm:starts_with("species_"))
 ```
 
 Finally, a curvature model. Mass grows with flipper length, but there's no law saying it grows linearly — let's give it the option.
 
 ```{r}
-# rec_quad <- ...
+rec_quad <- recipe(body_mass_g ~ flipper_length_mm +species+sex, data = pen_train) |>
+  step_dummy(species, sex) |>
+  step_poly(flipper_length_mm, degree= 2)
 ```
 
 Now the model spec and the four workflows. All four use the same `parsnip` spec — that's the point of separating the recipe from the model.
 
 ```{r}
+lm_spec <- linear_reg() |>
+  set_engine("lm")
 
+wfl_slr <- workflow() |> add_recipe(rec_slr) |> add_model(lm_spec)
+wfl_add <- workflow() |> add_recipe(rec_add) |> add_model(lm_spec)
+wfl_int <- workflow() |> add_recipe(rec_int) |> add_model(lm_spec)
+wfl_quad <- workflow() |> add_recipe(rec_quad) |> add_model(lm_spec)
 ```
 
 ## Cross-validation on the training set
@@ -158,7 +182,24 @@ Fit each workflow to the resamples and collect the metrics into one comparison t
 ```{r}
 # fit_resamples() each workflow, then bind_rows() the collect_metrics() output
 
+my_metrics<- metric_set(rmse, mae, rsq)
 
+cv_slr <- wfl_slr |> fit_resamples(pen_folds, metrics = my_metrics)
+cv_add <- wfl_add |> fit_resamples(pen_folds, metrics = my_metrics)
+cv_int <- wfl_int |> fit_resamples(pen_folds, metrics = my_metrics)
+cv_quad <- wfl_quad |> fit_resamples(pen_folds, metrics = my_metrics)
+
+cv_results <- bind_rows(
+  cv_slr |> collect_metrics() |> mutate(model = "SLR"),
+  cv_add |> collect_metrics()|> mutate(model = "Additive"),
+  cv_int |> collect_metrics()|> mutate(model = "Interaction"),
+  cv_quad |>collect_metrics() |> mutate(model = "Quadratic")
+) |>
+  select(model, .metric, mean, n, std_err)
+
+cv_results |> 
+  filter(.metric== "rmse") |>
+  arrange(mean)
 ```
 
 **Discussion 1.** Why did we run CV on the training set instead of on all of `pen`?
@@ -172,13 +213,17 @@ Fit each workflow to the resamples and collect the metrics into one comparison t
 Commit to a model, then use `last_fit()` on the original split object.
 
 ```{r}
-
+wfl_add |>
+  last_fit(pen_split, metrics = my_metrics) |>
+  collect_metrics()
 ```
 
 Now pull out the coefficients.
 
 ```{r}
-
+wfl_add |>
+  fit(pen_train) |>
+  tidy()
 ```
 
 **Discussion.** Interpret the `species_Gentoo` coefficient. What is it a comparison to, and where in the output is that baseline?
